@@ -40,7 +40,7 @@ def login_page():
         }
 
         .login-title {
-            font-size: 40px;
+            font-size: 35px;
             font-weight: 700;
             line-height: 1.1;
             margin-bottom: 2rem;
@@ -74,7 +74,7 @@ def login_page():
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
 
         st.markdown(
-            '<div class="login-title">🔐 Resume Screening</div>',
+            '<div class="login-title">🔐 Brevo Mail Automation</div>',
             unsafe_allow_html=True
         )
 
