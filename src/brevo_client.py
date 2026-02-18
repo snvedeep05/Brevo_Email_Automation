@@ -7,7 +7,7 @@ import os
 from typing import Dict, List, Optional
 import brevo_python
 from brevo_python.rest import ApiException
-from dotenv import load_dotenv
+import streamlit as st  # ✅ added for secrets
 
 
 class BrevoClient:
@@ -18,71 +18,24 @@ class BrevoClient:
         Initialize Brevo client with API key
         
         Args:
-            api_key: Brevo API key (if None, loads from environment)
+            api_key: Brevo API key (if None, loads from Streamlit secrets)
         """
-        load_dotenv()
-        self.api_key = api_key or os.getenv('BREVO_API_KEY')
+        # 🔁 replaced dotenv + os.getenv with st.secrets
+        self.api_key = api_key or st.secrets["BREVO_API_KEY"]
         
         if not self.api_key:
-            raise ValueError("BREVO_API_KEY not found in environment or provided")
+            raise ValueError("BREVO_API_KEY not found in secrets")
         
-        # Load sender email from environment
-        self.default_sender_email = os.getenv('BREVO_SENDER_EMAIL')
-        self.default_sender_name = os.getenv('BREVO_SENDER_NAME', 'AppWeave Labs')
+        # Load sender email from secrets
+        self.default_sender_email = st.secrets["BREVO_SENDER_EMAIL"]
+        self.default_sender_name = st.secrets.get("BREVO_SENDER_NAME", 'AppWeave Labs')
         
         # Configure Brevo API client
         configuration = brevo_python.Configuration()
         configuration.api_key['api-key'] = self.api_key
         self.api_client = brevo_python.ApiClient(configuration)
         self.email_api = brevo_python.TransactionalEmailsApi(self.api_client)
-    
-    def get_all_templates(self) -> List[Dict]:
-        """
-        Fetch all email templates from Brevo
         
-        Returns:
-            List of template dictionaries with id, name, and subject
-        """
-        try:
-            response = self.email_api.get_smtp_templates()
-            templates = []
-            
-            for template in response.templates:
-                templates.append({
-                    'id': template.id,
-                    'name': template.name,
-                    'subject': template.subject,
-                    'is_active': template.is_active
-                })
-            
-            return templates
-        except ApiException as e:
-            print(f"Exception when calling get_smtp_templates: {e}")
-            return []
-    
-    def get_template_by_id(self, template_id: int) -> Optional[Dict]:
-        """
-        Get specific template details by ID
-        
-        Args:
-            template_id: Template ID to fetch
-            
-        Returns:
-            Template details or None if not found
-        """
-        try:
-            response = self.email_api.get_smtp_template(template_id)
-            return {
-                'id': response.id,
-                'name': response.name,
-                'subject': response.subject,
-                'html_content': response.html_content,
-                'is_active': response.is_active
-            }
-        except ApiException as e:
-            print(f"Exception when calling get_smtp_template: {e}")
-            return None
-    
     def send_template_email(
         self,
         to_email: str,
@@ -135,7 +88,7 @@ class BrevoClient:
                 email_data.attachment = attachments
                 print(f"📎 Attaching {len(attachments)} file(s)")
             
-            # Use sender from .env or provided parameter
+            # Use sender from secrets or provided parameter
             final_sender_email = sender_email or self.default_sender_email
             final_sender_name = sender_name or self.default_sender_name
             
