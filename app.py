@@ -134,9 +134,15 @@ if uploaded_excel:
 
     st.dataframe(df, use_container_width=True)
 
-    # Decision summary
-    st.markdown("### 📊 Decision Summary")
-    st.write(df["Decision"].value_counts())
+    # Decision summary (clean metrics)
+st.markdown("### 📊 Decision Summary")
+
+counts = df["Decision"].value_counts()
+
+col1, col2 = st.columns(2)
+col1.metric("Shortlisted", counts.get("shortlisted", 0))
+col2.metric("Rejected", counts.get("rejected", 0))
+
 
     if st.button("🚀 Send Emails"):
         client = BrevoClient()
