@@ -4,3 +4,4 @@ requests
 python-dotenv
 sib-api-v3-sdk
 openpyxl
+brevo-python==1.0.25
