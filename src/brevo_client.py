@@ -5,8 +5,8 @@ Properly handles both {{ ATTRIBUTE }} and {{ contact.ATTRIBUTE }} templates
 """
 import os
 from typing import Dict, List, Optional
-import brevo_python
-from brevo_python.rest import ApiException
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 import streamlit as st  # ✅ added for secrets
 
 
