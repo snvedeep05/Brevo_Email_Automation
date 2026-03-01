@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from src.brevo_client import BrevoClient
+from brevo_client import BrevoClient
 
 st.set_page_config(page_title="Email Automation", layout="wide")
 
