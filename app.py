@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from src.brevo_client import BrevoClient
 from email_validator import validate_email, EmailNotValidError
+from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Email Automation", layout="wide")
 
@@ -251,6 +252,8 @@ with tab2:
             sent = 0
             skipped = 0
 
+            deadline_date = (datetime.today() + timedelta(days=10)).strftime("%d %B %Y")
+            
             progress = st.progress(0)
 
             for i, row in df.iterrows():
@@ -270,7 +273,8 @@ with tab2:
                     to_email=email,
                     template_id=TEMPLATE_ASSIGNMENT,
                     params={
-                        "FIRSTNAME": first_name
+                        "FIRSTNAME": first_name,
+                        "DEADLINE_DATE": deadline_date
                     },
                     to_name=name
                 )
