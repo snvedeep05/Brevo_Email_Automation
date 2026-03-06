@@ -256,7 +256,7 @@ with tab2:
             
             progress = st.progress(0)
 
-            for i, row in df.iterrows():
+            for i, (_, row) in enumerate(df.iterrows()):
 
                 name = str(row["full_name"]).strip()
                 email = str(row["email"]).strip()
