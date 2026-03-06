@@ -225,7 +225,7 @@ with tab2:
 
         df = pd.read_excel(uploaded_excel)
 
-        required_cols = ["name", "email"]
+        required_cols = ["full_name", "email", "job_title"]
 
         missing = [c for c in required_cols if c not in df.columns]
 
@@ -258,7 +258,7 @@ with tab2:
 
             for i, row in df.iterrows():
 
-                name = str(row["name"]).strip()
+                name = str(row["full_name"]).strip()
                 email = str(row["email"]).strip()
 
                 first_name = name.split()[0]
