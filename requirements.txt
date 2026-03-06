@@ -6,3 +6,4 @@ sib-api-v3-sdk
 openpyxl
 brevo-python==1.2.0
 email-validator
+datetime
