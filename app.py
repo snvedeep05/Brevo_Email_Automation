@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from src.brevo_client import BrevoClient
+from email_validator import validate_email, EmailNotValidError
 
 st.set_page_config(page_title="Email Automation", layout="wide")
 
@@ -11,17 +12,17 @@ COMPANY_LOGO = st.secrets["COMPANY_LOGO"]
 APP_USERNAME = st.secrets["APP_USERNAME"]
 APP_PASSWORD = st.secrets["APP_PASSWORD"]
 
+# ---------------- LOGIN PAGE ----------------
+
 def login_page():
 
     st.markdown(
         """
         <style>
-        /* Add breathing room at the top of the login page */
         .block-container {
             padding-top: 8.5rem;
         }
 
-        /* Company header */
         .company-header {
             display: flex;
             align-items: center;
@@ -40,23 +41,18 @@ def login_page():
         }
 
         .login-title {
-            font-size: 35px;
+            font-size: 40px;
             font-weight: 700;
-            line-height: 1.1;
             margin-bottom: 2rem;
             color: #111827;
         }
 
-        
-
-        /* Hide weird top header block */
         [data-testid="stHeader"] { display: none; }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # ---------------- COMPANY LOGO + NAME ----------------
     st.markdown(
         f"""
         <div class="company-header">
@@ -67,120 +63,224 @@ def login_page():
         unsafe_allow_html=True
     )
 
-    # ---------------- CENTER LOGIN ----------------
     col1, col2, col3 = st.columns([2, 1.2, 2])
 
     with col2:
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
 
         st.markdown(
-            '<div class="login-title">🔐 Brevo Mail Automation</div>',
+            '<div class="login-title">🔐 Resume Screening</div>',
             unsafe_allow_html=True
         )
 
-        username = st.text_input("Username", key="login_username")
-        password = st.text_input("Password", type="password", key="login_password")
-
-        st.markdown("<br>", unsafe_allow_html=True)
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
 
         if st.button("Login", use_container_width=True):
+
             if username == APP_USERNAME and password == APP_PASSWORD:
                 st.session_state.logged_in = True
                 st.rerun()
             else:
                 st.error("Invalid credentials")
 
-        st.markdown("</div>", unsafe_allow_html=True)
-
-
 
 if not st.session_state.logged_in:
     login_page()
     st.stop()
-    
-# Template mapping
-TEMPLATE_SHORTLISTED = 28   # success template
-TEMPLATE_REJECTED = 36      # rejection template
-
-st.subheader("📧 Send Emails from Excel")
-
-uploaded_excel = st.file_uploader(
-    "Upload reviewed Excel file",
-    type=["xlsx"]
-)
-
-if uploaded_excel:
-    df = pd.read_excel(uploaded_excel)
-
-    # Required columns from new Excel format
-    required_cols = ["full_name", "email", "decision", "job_title"]
-    missing = [c for c in required_cols if c not in df.columns]
-
-    if missing:
-        st.error(f"Missing required columns: {missing}")
-        st.stop()
-
-    # Rename for internal consistency
-    df = df.rename(columns={
-        "full_name": "Name",
-        "email": "Email",
-        "decision": "Decision",
-        "job_title": "Job_Title"
-    })
-
-    if df.empty:
-        st.warning("⚠️ Uploaded Excel has no rows to process.")
-        st.stop()
-
-    st.dataframe(df, use_container_width=True)
-
-    # Decision summary (clean metrics)
-    st.markdown("### 📊 Decision Summary")
-    
-    counts = df["Decision"].value_counts()
-    
-    col1, col2 = st.columns(2)
-    col1.metric("Shortlisted", counts.get("shortlisted", 0))
-    col2.metric("Rejected", counts.get("rejected", 0))
 
 
-    if st.button("🚀 Send Emails"):
-        client = BrevoClient()
-        sent, skipped = 0, 0
+# ---------------- TEMPLATE IDS ----------------
 
-        for _, row in df.iterrows():
-            name = str(row["Name"]).strip()
-            email = str(row["Email"]).strip()
-            decision = str(row["Decision"]).strip().lower()
-            job_title = str(row["Job_Title"]).strip()
+TEMPLATE_SHORTLISTED = 28
+TEMPLATE_REJECTED = 36
+TEMPLATE_ASSIGNMENT = 30
 
-            # Validate email
-            if not email or "@" not in email:
-                skipped += 1
-                continue
 
-            # ✅ Decision logic updated
-            if decision == "shortlisted":
-                template_id = TEMPLATE_SHORTLISTED
-            elif decision == "rejected":
-                template_id = TEMPLATE_REJECTED
-            else:
-                skipped += 1
-                continue
+# ---------------- TABS ----------------
 
-            success = client.send_template_email(
-                to_email=email,
-                template_id=template_id,
-                params={
-                    "FIRSTNAME": name,
-                    "JOB_TITLE": job_title
-                },
-                to_name=name
-            )
+tab1, tab2 = st.tabs([
+    "📧 Shortlisting Emails",
+    "📝 Assignment Emails"
+])
 
-            if success:
-                sent += 1
-            else:
-                skipped += 1
 
-        st.success(f"✅ Emails sent: {sent} | ⏭ Skipped/Failed: {skipped}")    
+# ====================================================
+# TAB 1 – SHORTLIST / REJECTION EMAILS
+# ====================================================
+
+with tab1:
+
+    st.subheader("📧 Send Shortlisting / Rejection Emails")
+
+    uploaded_excel = st.file_uploader(
+        "Upload reviewed Excel file",
+        type=["xlsx"],
+        key="shortlist_upload"
+    )
+
+    if uploaded_excel:
+
+        df = pd.read_excel(uploaded_excel)
+
+        required_cols = ["full_name", "email", "decision", "job_title"]
+
+        missing = [c for c in required_cols if c not in df.columns]
+
+        if missing:
+            st.error(f"Missing required columns: {missing}")
+            st.stop()
+
+        df = df.rename(columns={
+            "full_name": "Name",
+            "email": "Email",
+            "decision": "Decision",
+            "job_title": "Job_Title"
+        })
+
+        df = df.drop_duplicates(subset=["Email"])
+
+        if df.empty:
+            st.warning("⚠️ Uploaded Excel has no rows to process.")
+            st.stop()
+
+        st.dataframe(df, use_container_width=True)
+
+        st.markdown("### 📊 Decision Summary")
+
+        counts = df["Decision"].value_counts()
+
+        col1, col2 = st.columns(2)
+
+        col1.metric("Shortlisted", counts.get("shortlisted", 0))
+        col2.metric("Rejected", counts.get("rejected", 0))
+
+
+        if st.button("🚀 Send Emails"):
+
+            client = BrevoClient()
+
+            sent = 0
+            skipped = 0
+
+            progress = st.progress(0)
+
+            for i, row in df.iterrows():
+
+                name = str(row["Name"]).strip()
+                email = str(row["Email"]).strip()
+                decision = str(row["Decision"]).strip().lower()
+                job_title = str(row["Job_Title"]).strip()
+
+                try:
+                    email = validate_email(email).email
+                except EmailNotValidError:
+                    skipped += 1
+                    continue
+
+                if decision == "shortlisted":
+                    template_id = TEMPLATE_SHORTLISTED
+                elif decision == "rejected":
+                    template_id = TEMPLATE_REJECTED
+                else:
+                    skipped += 1
+                    continue
+
+                success = client.send_template_email(
+                    to_email=email,
+                    template_id=template_id,
+                    params={
+                        "FIRSTNAME": name,
+                        "JOB_TITLE": job_title
+                    },
+                    to_name=name
+                )
+
+                if success:
+                    sent += 1
+                else:
+                    skipped += 1
+
+                progress.progress((i + 1) / len(df))
+
+            st.success(f"✅ Emails sent: {sent}")
+            st.warning(f"⏭ Skipped / Failed: {skipped}")
+
+
+# ====================================================
+# TAB 2 – ASSIGNMENT EMAILS
+# ====================================================
+
+with tab2:
+
+    st.subheader("📝 Send Assignment Emails")
+
+    uploaded_excel = st.file_uploader(
+        "Upload Excel with interested candidates",
+        type=["xlsx"],
+        key="assignment_upload"
+    )
+
+    if uploaded_excel:
+
+        df = pd.read_excel(uploaded_excel)
+
+        required_cols = ["name", "email"]
+
+        missing = [c for c in required_cols if c not in df.columns]
+
+        if missing:
+            st.error(f"Missing required columns: {missing}")
+            st.stop()
+
+        df = df.drop_duplicates(subset=["email"])
+
+        if df.empty:
+            st.warning("⚠️ Excel has no valid rows.")
+            st.stop()
+
+        st.markdown("### 📋 Candidate Preview")
+
+        st.dataframe(df, use_container_width=True)
+
+        st.markdown(f"Total candidates: **{len(df)}**")
+
+        if st.button("🚀 Send Assignment Emails"):
+
+            client = BrevoClient()
+
+            sent = 0
+            skipped = 0
+
+            progress = st.progress(0)
+
+            for i, row in df.iterrows():
+
+                name = str(row["name"]).strip()
+                email = str(row["email"]).strip()
+
+                first_name = name.split()[0]
+
+                try:
+                    email = validate_email(email).email
+                except EmailNotValidError:
+                    skipped += 1
+                    continue
+
+                success = client.send_template_email(
+                    to_email=email,
+                    template_id=TEMPLATE_ASSIGNMENT,
+                    params={
+                        "FIRSTNAME": first_name
+                    },
+                    to_name=name
+                )
+
+                if success:
+                    sent += 1
+                else:
+                    skipped += 1
+
+                progress.progress((i + 1) / len(df))
+
+            st.success(f"✅ Assignment emails sent: {sent}")
+            st.warning(f"⏭ Skipped / Failed: {skipped}")
