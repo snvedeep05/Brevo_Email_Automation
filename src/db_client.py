@@ -48,3 +48,18 @@ def log_email_sent(db, email: str, template_id: int, full_name: str = None, job_
         job_title=job_title
     ))
     db.commit()
+
+
+def get_all_logs(db) -> list:
+    rows = db.query(EmailLog).order_by(EmailLog.sent_at.desc()).all()
+    return [
+        {
+            "log_id": r.log_id,
+            "full_name": r.full_name,
+            "email": r.email,
+            "template_id": r.template_id,
+            "job_title": r.job_title,
+            "sent_at": r.sent_at,
+        }
+        for r in rows
+    ]

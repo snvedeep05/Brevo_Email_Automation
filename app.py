@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from src.brevo_client import BrevoClient
-from src.db_client import get_session, is_already_sent, log_email_sent
+from src.db_client import get_session, is_already_sent, log_email_sent, get_all_logs
 from email_validator import validate_email, EmailNotValidError
 from datetime import datetime, timedelta
 
@@ -100,9 +100,10 @@ TEMPLATE_ASSIGNMENT = 30
 
 # ---------------- TABS ----------------
 
-tab1, tab2 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "📧 Shortlisting Emails",
-    "📝 Assignment Emails"
+    "📝 Assignment Emails",
+    "📊 Dashboard"
 ])
 
 
@@ -313,3 +314,85 @@ with tab2:
             if already_sent:
                 st.info(f"⏩ Already sent (skipped): {already_sent}")
             st.warning(f"⏭ Skipped / Failed: {skipped}")
+
+
+# ====================================================
+# TAB 3 – DASHBOARD
+# ====================================================
+
+TEMPLATE_LABELS = {
+    28: "Shortlisted",
+    36: "Rejected",
+    30: "Assignment",
+}
+
+with tab3:
+
+    st.subheader("📊 Email Sent Dashboard")
+
+    db = get_session()
+    try:
+        logs = get_all_logs(db)
+    finally:
+        db.close()
+
+    if not logs:
+        st.info("No emails have been sent yet.")
+    else:
+        df_logs = pd.DataFrame(logs)
+        df_logs["email_type"] = df_logs["template_id"].map(TEMPLATE_LABELS).fillna("Unknown")
+        df_logs["sent_at"] = pd.to_datetime(df_logs["sent_at"])
+
+        # ── Metrics row ──────────────────────────────────────────────
+        total = len(df_logs)
+        shortlisted = (df_logs["template_id"] == 28).sum()
+        rejected = (df_logs["template_id"] == 36).sum()
+        assignment = (df_logs["template_id"] == 30).sum()
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total Sent", total)
+        c2.metric("Shortlisted", int(shortlisted))
+        c3.metric("Rejected", int(rejected))
+        c4.metric("Assignment", int(assignment))
+
+        st.divider()
+
+        # ── Bar chart ────────────────────────────────────────────────
+        st.markdown("### Emails by Type")
+        chart_data = df_logs["email_type"].value_counts().reset_index()
+        chart_data.columns = ["Email Type", "Count"]
+        st.bar_chart(chart_data.set_index("Email Type"))
+
+        st.divider()
+
+        # ── Filter by type ───────────────────────────────────────────
+        st.markdown("### Sent Email Log")
+
+        filter_type = st.selectbox(
+            "Filter by email type",
+            options=["All"] + list(TEMPLATE_LABELS.values()),
+            key="dashboard_filter"
+        )
+
+        df_view = df_logs.copy()
+        if filter_type != "All":
+            df_view = df_view[df_view["email_type"] == filter_type]
+
+        df_view = df_view[["full_name", "email", "email_type", "job_title", "sent_at"]].rename(columns={
+            "full_name": "Name",
+            "email": "Email",
+            "email_type": "Type",
+            "job_title": "Job Title",
+            "sent_at": "Sent At"
+        })
+
+        st.dataframe(df_view, use_container_width=True)
+
+        # ── Export ───────────────────────────────────────────────────
+        csv = df_view.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️ Download as CSV",
+            data=csv,
+            file_name="email_log_export.csv",
+            mime="text/csv"
+        )
