@@ -215,10 +215,11 @@ with tab1:
             finally:
                 db.close()
 
-            st.success(f"✅ Emails sent: {sent}")
+            st.success(f"✅ Done — {sent} email(s) sent successfully.")
             if already_sent:
                 st.info(f"⏩ Already sent (skipped): {already_sent}")
-            st.warning(f"⏭ Skipped / Failed: {skipped}")
+            if skipped:
+                st.warning(f"⏭ Skipped / Failed: {skipped}")
 
 
 # ====================================================
@@ -310,10 +311,11 @@ with tab2:
             finally:
                 db.close()
 
-            st.success(f"✅ Assignment emails sent: {sent}")
+            st.success(f"✅ Done — {sent} assignment email(s) sent successfully.")
             if already_sent:
                 st.info(f"⏩ Already sent (skipped): {already_sent}")
-            st.warning(f"⏭ Skipped / Failed: {skipped}")
+            if skipped:
+                st.warning(f"⏭ Skipped / Failed: {skipped}")
 
 
 # ====================================================
