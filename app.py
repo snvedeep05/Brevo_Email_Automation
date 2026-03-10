@@ -164,8 +164,8 @@ with tab1:
             db = get_session()
 
             sent = 0
-            skipped = 0
-            already_sent = 0
+            skipped_list = []
+            already_sent_list = []
 
             progress = st.progress(0)
 
@@ -180,7 +180,7 @@ with tab1:
                     try:
                         email = validate_email(email).email
                     except EmailNotValidError:
-                        skipped += 1
+                        skipped_list.append(f"{name} — {email} (invalid email)")
                         continue
 
                     if decision == "shortlisted":
@@ -188,11 +188,11 @@ with tab1:
                     elif decision == "rejected":
                         template_id = TEMPLATE_REJECTED
                     else:
-                        skipped += 1
+                        skipped_list.append(f"{name} — {email} (unknown decision: {decision})")
                         continue
 
                     if is_already_sent(db, email, template_id):
-                        already_sent += 1
+                        already_sent_list.append(f"{name} — {email}")
                         continue
 
                     success = client.send_template_email(
@@ -209,17 +209,21 @@ with tab1:
                         log_email_sent(db, email, template_id, full_name=name, job_title=job_title)
                         sent += 1
                     else:
-                        skipped += 1
+                        skipped_list.append(f"{name} — {email} (send failed)")
 
                     progress.progress((i + 1) / len(df))
             finally:
                 db.close()
 
             st.success(f"✅ Done — {sent} email(s) sent successfully.")
-            if already_sent:
-                st.info(f"⏩ Already sent (skipped): {already_sent}")
-            if skipped:
-                st.warning(f"⏭ Skipped / Failed: {skipped}")
+            if already_sent_list:
+                st.info(f"⏩ Already sent (skipped): {len(already_sent_list)}")
+                for entry in already_sent_list:
+                    st.caption(f"   • {entry}")
+            if skipped_list:
+                st.warning(f"⏭ Skipped / Failed: {len(skipped_list)}")
+                for entry in skipped_list:
+                    st.caption(f"   • {entry}")
 
 
 # ====================================================
@@ -266,8 +270,8 @@ with tab2:
             db = get_session()
 
             sent = 0
-            skipped = 0
-            already_sent = 0
+            skipped_list = []
+            already_sent_list = []
 
             deadline_date = (datetime.today() + timedelta(days=10)).strftime("%d %B %Y")
 
@@ -284,11 +288,11 @@ with tab2:
                     try:
                         email = validate_email(email).email
                     except EmailNotValidError:
-                        skipped += 1
+                        skipped_list.append(f"{name} — {email} (invalid email)")
                         continue
 
                     if is_already_sent(db, email, TEMPLATE_ASSIGNMENT):
-                        already_sent += 1
+                        already_sent_list.append(f"{name} — {email}")
                         continue
 
                     success = client.send_template_email(
@@ -305,17 +309,21 @@ with tab2:
                         log_email_sent(db, email, TEMPLATE_ASSIGNMENT, full_name=name)
                         sent += 1
                     else:
-                        skipped += 1
+                        skipped_list.append(f"{name} — {email} (send failed)")
 
                     progress.progress((i + 1) / len(df))
             finally:
                 db.close()
 
             st.success(f"✅ Done — {sent} assignment email(s) sent successfully.")
-            if already_sent:
-                st.info(f"⏩ Already sent (skipped): {already_sent}")
-            if skipped:
-                st.warning(f"⏭ Skipped / Failed: {skipped}")
+            if already_sent_list:
+                st.info(f"⏩ Already sent (skipped): {len(already_sent_list)}")
+                for entry in already_sent_list:
+                    st.caption(f"   • {entry}")
+            if skipped_list:
+                st.warning(f"⏭ Skipped / Failed: {len(skipped_list)}")
+                for entry in skipped_list:
+                    st.caption(f"   • {entry}")
 
 
 # ====================================================
