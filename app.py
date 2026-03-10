@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from src.brevo_client import BrevoClient
+from src.db_client import get_session, is_already_sent, log_email_sent
 from email_validator import validate_email, EmailNotValidError
 from datetime import datetime, timedelta
 
@@ -159,51 +160,63 @@ with tab1:
         if st.button("🚀 Send Emails"):
 
             client = BrevoClient()
+            db = get_session()
 
             sent = 0
             skipped = 0
+            already_sent = 0
 
             progress = st.progress(0)
 
-            for i, row in df.iterrows():
+            try:
+                for i, row in df.iterrows():
 
-                name = str(row["Name"]).strip()
-                email = str(row["Email"]).strip()
-                decision = str(row["Decision"]).strip().lower()
-                job_title = str(row["Job_Title"]).strip()
+                    name = str(row["Name"]).strip()
+                    email = str(row["Email"]).strip()
+                    decision = str(row["Decision"]).strip().lower()
+                    job_title = str(row["Job_Title"]).strip()
 
-                try:
-                    email = validate_email(email).email
-                except EmailNotValidError:
-                    skipped += 1
-                    continue
+                    try:
+                        email = validate_email(email).email
+                    except EmailNotValidError:
+                        skipped += 1
+                        continue
 
-                if decision == "shortlisted":
-                    template_id = TEMPLATE_SHORTLISTED
-                elif decision == "rejected":
-                    template_id = TEMPLATE_REJECTED
-                else:
-                    skipped += 1
-                    continue
+                    if decision == "shortlisted":
+                        template_id = TEMPLATE_SHORTLISTED
+                    elif decision == "rejected":
+                        template_id = TEMPLATE_REJECTED
+                    else:
+                        skipped += 1
+                        continue
 
-                success = client.send_template_email(
-                    to_email=email,
-                    template_id=template_id,
-                    params={
-                        "FIRSTNAME": name,
-                        "JOB_TITLE": job_title
-                    },
-                    to_name=name
-                )
+                    if is_already_sent(db, email, template_id):
+                        already_sent += 1
+                        continue
 
-                if success:
-                    sent += 1
-                else:
-                    skipped += 1
+                    success = client.send_template_email(
+                        to_email=email,
+                        template_id=template_id,
+                        params={
+                            "FIRSTNAME": name,
+                            "JOB_TITLE": job_title
+                        },
+                        to_name=name
+                    )
 
-                progress.progress((i + 1) / len(df))
+                    if success:
+                        log_email_sent(db, email, template_id, full_name=name, job_title=job_title)
+                        sent += 1
+                    else:
+                        skipped += 1
+
+                    progress.progress((i + 1) / len(df))
+            finally:
+                db.close()
 
             st.success(f"✅ Emails sent: {sent}")
+            if already_sent:
+                st.info(f"⏩ Already sent (skipped): {already_sent}")
             st.warning(f"⏭ Skipped / Failed: {skipped}")
 
 
@@ -248,43 +261,55 @@ with tab2:
         if st.button("🚀 Send Assignment Emails"):
 
             client = BrevoClient()
+            db = get_session()
 
             sent = 0
             skipped = 0
+            already_sent = 0
 
             deadline_date = (datetime.today() + timedelta(days=10)).strftime("%d %B %Y")
-            
+
             progress = st.progress(0)
 
-            for i, (_, row) in enumerate(df.iterrows()):
+            try:
+                for i, (_, row) in enumerate(df.iterrows()):
 
-                name = str(row["full_name"]).strip()
-                email = str(row["email"]).strip()
+                    name = str(row["full_name"]).strip()
+                    email = str(row["email"]).strip()
 
-                first_name = name.split()[0]
+                    first_name = name.split()[0]
 
-                try:
-                    email = validate_email(email).email
-                except EmailNotValidError:
-                    skipped += 1
-                    continue
+                    try:
+                        email = validate_email(email).email
+                    except EmailNotValidError:
+                        skipped += 1
+                        continue
 
-                success = client.send_template_email(
-                    to_email=email,
-                    template_id=TEMPLATE_ASSIGNMENT,
-                    params={
-                        "FIRSTNAME": first_name,
-                        "DEADLINE_DATE": deadline_date
-                    },
-                    to_name=name
-                )
+                    if is_already_sent(db, email, TEMPLATE_ASSIGNMENT):
+                        already_sent += 1
+                        continue
 
-                if success:
-                    sent += 1
-                else:
-                    skipped += 1
+                    success = client.send_template_email(
+                        to_email=email,
+                        template_id=TEMPLATE_ASSIGNMENT,
+                        params={
+                            "FIRSTNAME": first_name,
+                            "DEADLINE_DATE": deadline_date
+                        },
+                        to_name=name
+                    )
 
-                progress.progress((i + 1) / len(df))
+                    if success:
+                        log_email_sent(db, email, TEMPLATE_ASSIGNMENT, full_name=name)
+                        sent += 1
+                    else:
+                        skipped += 1
+
+                    progress.progress((i + 1) / len(df))
+            finally:
+                db.close()
 
             st.success(f"✅ Assignment emails sent: {sent}")
+            if already_sent:
+                st.info(f"⏩ Already sent (skipped): {already_sent}")
             st.warning(f"⏭ Skipped / Failed: {skipped}")

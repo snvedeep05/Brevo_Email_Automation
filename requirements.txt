@@ -7,3 +7,5 @@ openpyxl
 brevo-python==1.2.0
 email-validator
 datetime
+sqlalchemy
+psycopg2-binary
